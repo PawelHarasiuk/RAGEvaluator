@@ -1,29 +1,39 @@
-from langchain.indexes import VectorstoreIndexCreator
-from langchain.chains import RetrievalQA
+from ai.readers import DocumentReaderFactory
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 
-from ai.readers import DocumentReader
-from ai.chats import Chat
+from typing import List
 
+class DocumentProcessor:
+    DEFAULT_CHUNK_SIZE = 1000
+    DEFAULT_CHUNK_OVERLAP = 200
 
-class DocumentQA:
-    def __init__(self, reader: DocumentReader, chat: Chat):
-        self.llm = chat.get_llm()
+    def __init__(self, file_path: str):
+        self.documents = self._load_document(file_path)
+        self.embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+    def _load_document(self, file_path: str) -> any:
+        reader = DocumentReaderFactory.get_reader(file_path=file_path)
         loader = reader.get_loader()
-        loader.load()
-        embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        documents = loader.load()
 
-        index_creator = VectorstoreIndexCreator(
-            embedding=embedding_model,
-            vectorstore_kwargs={"checkpoint": "all-MiniLM-L6-v2"}
+        return documents
+
+    def _split_document(self) -> List[Document]:
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.DEFAULT_CHUNK_SIZE,
+            chunk_overlap=self.DEFAULT_CHUNK_OVERLAP,
+            length_function=len
         )
 
-        self.index = index_creator.from_loaders([loader])
+        documents = self.documents
+        chunks = text_splitter.split_documents(documents)
 
-    def query(self, question: str):
-        response = self.index.query(
-            question=question,
-            llm=self.llm
-        )
+        return chunks
 
-        return response
+    def create_vectorstore(self) -> FAISS:
+        chunks = self._split_document()
+        vectorstore = FAISS.from_documents(chunks, self.embedding_model)
+        return vectorstore

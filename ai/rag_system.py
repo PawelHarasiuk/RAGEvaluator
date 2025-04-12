@@ -11,7 +11,7 @@ class SimpleRagSystem:
         k = self.DEFAULT_RETRIEVER_K
         self.retriever = vectorstore.as_retriever(search_kwargs={"k": k})
 
-    def create_rag_chain(self):
+    def _create_rag_chain(self):
         rag_prompt_template = """
         You are an AI assistant for question-answering tasks. 
         Use the following pieces of retrieved context to answer the question. 
@@ -39,7 +39,8 @@ class SimpleRagSystem:
 
         return rag_chain
 
-    def query_rag_system(self, rag_chain, query):
+    def query_rag_system(self, query):
+        rag_chain = self._create_rag_chain()
         result = rag_chain.invoke(query)
 
         return {
